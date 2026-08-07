@@ -394,6 +394,7 @@ function updateCamera() {
 }
 
 let mouse = { x: 0, y: 0, down: false };
+let mouseActive = false; // baru true setelah pointer/sentuhan pertama, agar highlight tidak nyasar ke (0,0) sebelum diarahkan
 // Konversi koordinat layar (CSS px) ke koordinat internal canvas (800x480),
 // perlu karena canvas bisa di-stretch via CSS saat fullscreen.
 function toCanvasCoords(clientX, clientY) {
@@ -408,6 +409,7 @@ function toCanvasCoords(clientX, clientY) {
 canvas.addEventListener('mousemove', e => {
   const p = toCanvasCoords(e.clientX, e.clientY);
   mouse.x = p.x; mouse.y = p.y;
+  mouseActive = true;
 });
 canvas.addEventListener('mousedown', e => {
   if (e.button === 0) { mouse.down = true; player.punching = true; }
@@ -422,6 +424,7 @@ canvas.addEventListener('touchstart', e => {
   const p = toCanvasCoords(t.clientX, t.clientY);
   mouse.x = p.x; mouse.y = p.y;
   mouse.down = true; player.punching = true;
+  mouseActive = true;
 }, {passive:true});
 canvas.addEventListener('touchend', () => { mouse.down = false; player.punching = false; }, {passive:true});
 
@@ -433,6 +436,7 @@ function getTargetTile() {
     const row = Math.floor(pcy / TILE);
     return { col, row };
   }
+  if (!mouseActive) return null; // belum ada interaksi pointer -> jangan tampilkan highlight di (0,0)
   const wx = mouse.x / zoom + camX;
   const wy = mouse.y / zoom + camY;
   const col = Math.floor(wx / TILE);
@@ -539,8 +543,13 @@ function draw() {
           ctx.fillRect(sx, sy, TILE, TILE);
         }
       } else {
-        // dinding gua sudah digali - tampilkan wallpaper latar gua, bukan hitam polos
+        // dinding gua sudah digali - tampilkan wallpaper latar gua, bukan hitam polos.
+        // Pattern di-lock ke koordinat dunia (bukan koordinat layar) via setTransform,
+        // supaya motifnya tetap selaras dengan grid blok walau kamera/pemain bergerak.
         if (!deepBgPattern) deepBgPattern = ctx.createPattern(deepBgCanvas, 'repeat');
+        if (deepBgPattern && deepBgPattern.setTransform) {
+          deepBgPattern.setTransform(new DOMMatrix().translate(-camX, -camY));
+        }
         ctx.fillStyle = deepBgPattern || '#12295c';
         ctx.fillRect(sx, sy, TILE, TILE);
       }
