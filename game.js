@@ -1,15 +1,15 @@
 // ====== SPRITE ASSETS (dimuat dari folder /Assets) ======
 const SPRITE_PATHS = {
-  dirt: 'Assets/Sprites/Blocks/Dirt.png',
-  rock: 'Assets/Sprites/Blocks/Rock.png',
-  wood: 'Assets/Sprites/Blocks/Wood.png',
-  lava: 'Assets/Sprites/Blocks/Lava.png',
-  cavebg: 'Assets/Sprites/Backgrounds/CaveWall.png',
-  base_body: 'Assets/Sprites/Characters/Base_Body.png',
-  walk_sheet: 'Assets/Sprites/Characters/Walk_Spritesheet.png',
-  punch_sheet: 'Assets/Sprites/Characters/Punch_Spritesheet.png',
-  slot: 'Assets/Sprites/UI/Inventory_Slot.png',
-  button: 'Assets/Sprites/UI/Button.png',
+  dirt: 'assets/sprites/blocks/dirt.png',
+  rock: 'assets/sprites/blocks/rock.png',
+  wood: 'assets/sprites/blocks/wood.png',
+  lava: 'assets/sprites/blocks/lava.png',
+  cavebg: 'assets/sprites/backgrounds/cavewall.png',
+  base_body: 'assets/sprites/characters/base_body.png',
+  walk_sheet: 'assets/sprites/characters/walk_spritesheet.png',
+  punch_sheet: 'assets/sprites/characters/punch_spritesheet.png',
+  slot: 'assets/sprites/ui/inventory_slot.png',
+  button: 'assets/sprites/ui/button.png',
 };
 const spriteImgs = {};
 Object.keys(SPRITE_PATHS).forEach(k => {
