@@ -4,7 +4,6 @@ const SPRITE_PATHS = {
   rock: 'assets/sprites/blocks/rock.png',
   wood: 'assets/sprites/blocks/wood.png',
   lava: 'assets/sprites/blocks/lava.png',
-  cavebg: 'assets/sprites/backgrounds/cavewall.png',
   base_body: 'assets/sprites/characters/base_body.png',
   walk_sheet: 'assets/sprites/characters/walk_spritesheet.png',
   punch_sheet: 'assets/sprites/characters/punch_spritesheet.png',
@@ -25,44 +24,6 @@ const TILE = 32; // sesuai ukuran sprite asli 32x32
 const COLS = 100; // lebar dunia dalam jumlah blok
 const ROWS = 100; // tinggi dunia dalam jumlah blok
 
-// Wallpaper latar belakang gua yang terlihat setelah cavewall dihancurkan
-// (dibuat secara prosedural agar tidak bergantung pada file sprite tambahan)
-const deepBgCanvas = document.createElement('canvas');
-deepBgCanvas.width = TILE * 4;
-deepBgCanvas.height = TILE * 4;
-(function buildDeepBgPattern() {
-  const c = deepBgCanvas.getContext('2d');
-  const grad = c.createLinearGradient(0, 0, 0, deepBgCanvas.height);
-  grad.addColorStop(0, '#0a1a3a');
-  grad.addColorStop(1, '#12295c');
-  c.fillStyle = grad;
-  c.fillRect(0, 0, deepBgCanvas.width, deepBgCanvas.height);
-  // bintik-bintik lembut mirip batu/kristal di kejauhan
-  const rand = (seed => () => {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
-  })(42);
-  for (let i = 0; i < 90; i++) {
-    const x = rand() * deepBgCanvas.width;
-    const y = rand() * deepBgCanvas.height;
-    const r = rand() * 1.6 + 0.4;
-    c.fillStyle = `rgba(255,255,255,${0.03 + rand()*0.05})`;
-    c.beginPath();
-    c.arc(x, y, r, 0, Math.PI*2);
-    c.fill();
-  }
-  for (let i = 0; i < 14; i++) {
-    const x = rand() * deepBgCanvas.width;
-    const y = rand() * deepBgCanvas.height;
-    const r = rand() * 3 + 1.5;
-    c.fillStyle = `rgba(70,140,255,${0.08 + rand()*0.08})`;
-    c.beginPath();
-    c.arc(x, y, r, 0, Math.PI*2);
-    c.fill();
-  }
-})();
-let deepBgPattern = null;
-
 // Block types dipetakan ke sprite. main/shade = fallback warna kalau tidak punya sprite.
 const BLOCKS = {
   0: { name:'Udara', solid:false },
@@ -78,17 +39,12 @@ const BLOCKS = {
 
 // World generation
 let world = [];
-let bgWorld = []; // layer dinding gua (cavewall) di belakang ruang kosong bawah tanah
-const CAVEWALL_HARD = 2; // tingkat kekerasan dinding gua (relatif terhadap blok lain)
 function generateWorld() {
   world = [];
-  bgWorld = [];
   const groundLevel = Math.floor(ROWS * 0.45);
   const lavaZone = ROWS - 5; // dekat dasar dunia = zona lava
-  const undergroundStart = groundLevel + 1;
   for (let y = 0; y < ROWS; y++) {
     world[y] = [];
-    bgWorld[y] = [];
     for (let x = 0; x < COLS; x++) {
       let val = 0;
       const hillNoise = Math.sin(x * 0.3) * 2 + Math.sin(x * 0.08) * 3;
@@ -106,8 +62,6 @@ function generateWorld() {
         }
       }
       world[y][x] = val;
-      // dinding gua ada di setiap ruang kosong (udara) di bawah tanah
-      bgWorld[y][x] = (val === 0 && y >= undergroundStart) ? 1 : 0;
     }
   }
 }
@@ -478,7 +432,6 @@ function tryPlace() {
   }
 }
 
-const undergroundStart = Math.floor(ROWS * 0.45) + 1;
 function updateDigging() {
   const digging = mouse.down || touchPunchActive;
   if (!digging) { breakProgress = {}; return; }
@@ -489,16 +442,7 @@ function updateDigging() {
   const bid = world[row][col];
 
   if (bid === 0) {
-    // Tidak ada blok solid di sini - coba gali dinding gua di belakangnya
-    if (row >= undergroundStart && bgWorld[row][col] === 1) {
-      const key = 'bg:' + col + ',' + row;
-      breakProgress[key] = (breakProgress[key] || 0) + 1;
-      const neededFrames = CAVEWALL_HARD * 12;
-      if (breakProgress[key] >= neededFrames) {
-        bgWorld[row][col] = 0;
-        delete breakProgress[key];
-      }
-    }
+    // ruang kosong, tidak ada yang bisa digali di sini
     return;
   }
 
@@ -532,41 +476,6 @@ function draw() {
   const endCol = startCol + Math.ceil(viewW / TILE) + 1;
   const startRow = Math.floor(camY / TILE);
   const endRow = startRow + Math.ceil(viewH / TILE) + 1;
-  const undergroundStart = Math.floor(ROWS * 0.45) + 1;
-
-  for (let row = startRow; row <= endRow; row++) {
-    if (row < undergroundStart || row >= ROWS) continue;
-    for (let col = startCol; col <= endCol; col++) {
-      if (col < 0 || col >= COLS) continue;
-      if (world[row][col] !== 0) continue;
-      const sx = col*TILE - camX;
-      const sy = row*TILE - camY;
-      if (bgWorld[row][col] === 1) {
-        if (spriteImgs.cavebg && spriteImgs.cavebg.complete) {
-          ctx.drawImage(spriteImgs.cavebg, sx, sy, TILE, TILE);
-        } else {
-          ctx.fillStyle = '#1c1a1e';
-          ctx.fillRect(sx, sy, TILE, TILE);
-        }
-        const key = 'bg:' + col + ',' + row;
-        if (breakProgress[key]) {
-          const progress = breakProgress[key] / (CAVEWALL_HARD*12);
-          ctx.fillStyle = `rgba(0,0,0,${0.55*progress})`;
-          ctx.fillRect(sx, sy, TILE, TILE);
-        }
-      } else {
-        // dinding gua sudah digali - tampilkan wallpaper latar gua, bukan hitam polos.
-        // Pattern di-lock ke koordinat dunia (bukan koordinat layar) via setTransform,
-        // supaya motifnya tetap selaras dengan grid blok walau kamera/pemain bergerak.
-        if (!deepBgPattern) deepBgPattern = ctx.createPattern(deepBgCanvas, 'repeat');
-        if (deepBgPattern && deepBgPattern.setTransform) {
-          deepBgPattern.setTransform(new DOMMatrix().translate(-camX, -camY));
-        }
-        ctx.fillStyle = deepBgPattern || '#12295c';
-        ctx.fillRect(sx, sy, TILE, TILE);
-      }
-    }
-  }
 
   for (let row = startRow; row <= endRow; row++) {
     if (row < 0 || row >= ROWS) continue;
