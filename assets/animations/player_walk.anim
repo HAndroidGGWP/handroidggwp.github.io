@@ -1,0 +1,11 @@
+{
+  "name": "Player_Walk",
+  "spritesheet": "Sprites/Characters/Walk_Spritesheet.png",
+  "frame_size": [
+    32,
+    32
+  ],
+  "frame_count": 4,
+  "fps": 8,
+  "loop": true
+}
