@@ -39,12 +39,17 @@ const BLOCKS = {
 
 // World generation
 let world = [];
+let bgWorld = []; // layer dinding gua (cavewall) di belakang ruang kosong bawah tanah
+const CAVEWALL_HARD = 2; // tingkat kekerasan dinding gua (relatif terhadap blok lain)
 function generateWorld() {
   world = [];
+  bgWorld = [];
   const groundLevel = Math.floor(ROWS * 0.45);
   const lavaZone = ROWS - 5; // dekat dasar dunia = zona lava
+  const undergroundStart = groundLevel + 1;
   for (let y = 0; y < ROWS; y++) {
     world[y] = [];
+    bgWorld[y] = [];
     for (let x = 0; x < COLS; x++) {
       let val = 0;
       const hillNoise = Math.sin(x * 0.3) * 2 + Math.sin(x * 0.08) * 3;
@@ -62,6 +67,8 @@ function generateWorld() {
         }
       }
       world[y][x] = val;
+      // dinding gua ada di setiap ruang kosong (udara) di bawah tanah
+      bgWorld[y][x] = (val === 0 && y >= undergroundStart) ? 1 : 0;
     }
   }
 }
@@ -312,6 +319,7 @@ function tryPlace() {
   }
 }
 
+const undergroundStart = Math.floor(ROWS * 0.45) + 1;
 function updateDigging() {
   const digging = mouse.down || touchPunchActive;
   if (!digging) { breakProgress = {}; return; }
@@ -320,7 +328,21 @@ function updateDigging() {
   const { col, row } = t;
   if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return;
   const bid = world[row][col];
-  if (bid === 0) return;
+
+  if (bid === 0) {
+    // Tidak ada blok solid di sini - coba gali dinding gua di belakangnya
+    if (row >= undergroundStart && bgWorld[row][col] === 1) {
+      const key = 'bg:' + col + ',' + row;
+      breakProgress[key] = (breakProgress[key] || 0) + 1;
+      const neededFrames = CAVEWALL_HARD * 12;
+      if (breakProgress[key] >= neededFrames) {
+        bgWorld[row][col] = 0;
+        delete breakProgress[key];
+      }
+    }
+    return;
+  }
+
   const block = BLOCKS[bid];
   const key = col + ',' + row;
   breakProgress[key] = (breakProgress[key] || 0) + 1;
@@ -356,10 +378,22 @@ function draw() {
       if (world[row][col] !== 0) continue;
       const sx = col*TILE - camX;
       const sy = row*TILE - camY;
-      if (spriteImgs.cavebg && spriteImgs.cavebg.complete) {
-        ctx.drawImage(spriteImgs.cavebg, sx, sy, TILE, TILE);
+      if (bgWorld[row][col] === 1) {
+        if (spriteImgs.cavebg && spriteImgs.cavebg.complete) {
+          ctx.drawImage(spriteImgs.cavebg, sx, sy, TILE, TILE);
+        } else {
+          ctx.fillStyle = '#1c1a1e';
+          ctx.fillRect(sx, sy, TILE, TILE);
+        }
+        const key = 'bg:' + col + ',' + row;
+        if (breakProgress[key]) {
+          const progress = breakProgress[key] / (CAVEWALL_HARD*12);
+          ctx.fillStyle = `rgba(0,0,0,${0.55*progress})`;
+          ctx.fillRect(sx, sy, TILE, TILE);
+        }
       } else {
-        ctx.fillStyle = '#1c1a1e';
+        // dinding gua sudah digali - ruang kosong gelap
+        ctx.fillStyle = '#0c0b0d';
         ctx.fillRect(sx, sy, TILE, TILE);
       }
     }
