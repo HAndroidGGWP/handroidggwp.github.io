@@ -21,8 +21,46 @@ Object.keys(SPRITE_PATHS).forEach(k => {
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const TILE = 32; // sesuai ukuran sprite asli 32x32
-const COLS = Math.floor(canvas.width / TILE);
-const ROWS = Math.floor(canvas.height / TILE);
+const COLS = 100; // lebar dunia dalam jumlah blok
+const ROWS = 100; // tinggi dunia dalam jumlah blok
+
+// Wallpaper latar belakang gua yang terlihat setelah cavewall dihancurkan
+// (dibuat secara prosedural agar tidak bergantung pada file sprite tambahan)
+const deepBgCanvas = document.createElement('canvas');
+deepBgCanvas.width = TILE * 4;
+deepBgCanvas.height = TILE * 4;
+(function buildDeepBgPattern() {
+  const c = deepBgCanvas.getContext('2d');
+  const grad = c.createLinearGradient(0, 0, 0, deepBgCanvas.height);
+  grad.addColorStop(0, '#0a1a3a');
+  grad.addColorStop(1, '#12295c');
+  c.fillStyle = grad;
+  c.fillRect(0, 0, deepBgCanvas.width, deepBgCanvas.height);
+  // bintik-bintik lembut mirip batu/kristal di kejauhan
+  const rand = (seed => () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  })(42);
+  for (let i = 0; i < 90; i++) {
+    const x = rand() * deepBgCanvas.width;
+    const y = rand() * deepBgCanvas.height;
+    const r = rand() * 1.6 + 0.4;
+    c.fillStyle = `rgba(255,255,255,${0.03 + rand()*0.05})`;
+    c.beginPath();
+    c.arc(x, y, r, 0, Math.PI*2);
+    c.fill();
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = rand() * deepBgCanvas.width;
+    const y = rand() * deepBgCanvas.height;
+    const r = rand() * 3 + 1.5;
+    c.fillStyle = `rgba(70,140,255,${0.08 + rand()*0.08})`;
+    c.beginPath();
+    c.arc(x, y, r, 0, Math.PI*2);
+    c.fill();
+  }
+})();
+let deepBgPattern = null;
 
 // Block types dipetakan ke sprite. main/shade = fallback warna kalau tidak punya sprite.
 const BLOCKS = {
@@ -392,8 +430,9 @@ function draw() {
           ctx.fillRect(sx, sy, TILE, TILE);
         }
       } else {
-        // dinding gua sudah digali - ruang kosong gelap
-        ctx.fillStyle = '#0c0b0d';
+        // dinding gua sudah digali - tampilkan wallpaper latar gua, bukan hitam polos
+        if (!deepBgPattern) deepBgPattern = ctx.createPattern(deepBgCanvas, 'repeat');
+        ctx.fillStyle = deepBgPattern || '#12295c';
         ctx.fillRect(sx, sy, TILE, TILE);
       }
     }
