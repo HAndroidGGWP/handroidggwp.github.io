@@ -264,6 +264,45 @@ function selectSlot(i) {
 }
 buildHotbar();
 
+// ====== INVENTORY DRAWER (buka/tutup via tap atau swipe/scroll pada handle) ======
+const invFrame = document.getElementById('inventoryFrame');
+const invHandle = document.getElementById('invHandle');
+function setInvOpen(open) {
+  invFrame.classList.toggle('open', open);
+}
+function toggleInv() {
+  setInvOpen(!invFrame.classList.contains('open'));
+}
+invHandle.addEventListener('click', () => {
+  if (invDragMoved) { invDragMoved = false; return; } // abaikan klik bayangan setelah swipe
+  toggleInv();
+});
+
+let invDragStartY = null;
+let invDragMoved = false;
+invHandle.addEventListener('touchstart', e => {
+  invDragStartY = e.touches[0].clientY;
+  invDragMoved = false;
+}, {passive:true});
+invHandle.addEventListener('touchmove', e => {
+  if (invDragStartY === null) return;
+  const dy = e.touches[0].clientY - invDragStartY;
+  if (Math.abs(dy) > 12) {
+    invDragMoved = true;
+    if (dy < 0) setInvOpen(true);   // geser/scroll ke atas -> buka
+    else setInvOpen(false);         // geser/scroll ke bawah -> tutup
+  }
+}, {passive:true});
+invHandle.addEventListener('touchend', () => {
+  invDragStartY = null;
+  // kalau tidak ada gesernya sama sekali, anggap itu tap biasa (di-handle oleh 'click')
+}, {passive:true});
+// scroll wheel (desktop/trackpad) di atas handle juga bisa buka/tutup
+invHandle.addEventListener('wheel', e => {
+  e.preventDefault();
+  setInvOpen(e.deltaY < 0);
+}, {passive:false});
+
 function showMsg(text) {
   const el = document.getElementById('msg');
   el.textContent = text;
