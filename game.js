@@ -8,6 +8,7 @@ const SPRITE_PATHS = {
   base_body: 'assets/sprites/characters/base_body.png',
   walk_sheet: 'assets/sprites/characters/walk_spritesheet.png',
   punch_sheet: 'assets/sprites/characters/punch_spritesheet.png',
+  jump_sheet: 'assets/sprites/characters/jump_spritesheet.png',
   slot: 'assets/sprites/ui/inventory_slot.png',
   button: 'assets/sprites/ui/button.png',
 };
@@ -135,6 +136,8 @@ const player = {
   punching: false,
   punchFrame: 0,
   punchTimer: 0,
+  jumpFrame: 0,
+  airTime: 0, // jumlah frame sejak kaki lepas dari tanah, dipakai untuk pilih pose lompat
 };
 (function placePlayer(){
   const px = Math.floor(player.x / TILE);
@@ -366,6 +369,18 @@ function updatePlayer() {
     player.punchFrame = 0;
   }
 
+  // Animasi lompat: 4 frame di jump_spritesheet.png = [jongkok tolakan, naik, melayang, jatuh]
+  if (!player.onGround) {
+    player.airTime++;
+    if (player.airTime < 6) player.jumpFrame = 0;          // baru lepas landas - pose jongkok/tolak
+    else if (player.vy < -1) player.jumpFrame = 1;          // masih naik kencang
+    else if (player.vy < 2) player.jumpFrame = 2;           // dekat puncak / melayang
+    else player.jumpFrame = 3;                              // sedang jatuh
+  } else {
+    player.airTime = 0;
+    player.jumpFrame = 0;
+  }
+
   document.getElementById('posInfo').textContent =
     `Posisi: (${Math.floor(player.x/TILE)}, ${Math.floor(player.y/TILE)})`;
 }
@@ -394,7 +409,6 @@ function updateCamera() {
 }
 
 let mouse = { x: 0, y: 0, down: false };
-let mouseActive = false; // baru true setelah pointer/sentuhan pertama, agar highlight tidak nyasar ke (0,0) sebelum diarahkan
 // Konversi koordinat layar (CSS px) ke koordinat internal canvas (800x480),
 // perlu karena canvas bisa di-stretch via CSS saat fullscreen.
 function toCanvasCoords(clientX, clientY) {
@@ -409,7 +423,6 @@ function toCanvasCoords(clientX, clientY) {
 canvas.addEventListener('mousemove', e => {
   const p = toCanvasCoords(e.clientX, e.clientY);
   mouse.x = p.x; mouse.y = p.y;
-  mouseActive = true;
 });
 canvas.addEventListener('mousedown', e => {
   if (e.button === 0) { mouse.down = true; player.punching = true; }
@@ -424,7 +437,6 @@ canvas.addEventListener('touchstart', e => {
   const p = toCanvasCoords(t.clientX, t.clientY);
   mouse.x = p.x; mouse.y = p.y;
   mouse.down = true; player.punching = true;
-  mouseActive = true;
 }, {passive:true});
 canvas.addEventListener('touchend', () => { mouse.down = false; player.punching = false; }, {passive:true});
 
@@ -436,7 +448,7 @@ function getTargetTile() {
     const row = Math.floor(pcy / TILE);
     return { col, row };
   }
-  if (!mouseActive) return null; // belum ada interaksi pointer -> jangan tampilkan highlight di (0,0)
+  if (!mouse.down) return null; // hanya tampilkan highlight selagi benar-benar menekan/menahan untuk menggali, bukan dari tap terakhir yang sudah dilepas
   const wx = mouse.x / zoom + camX;
   const wy = mouse.y / zoom + camY;
   const col = Math.floor(wx / TILE);
@@ -609,6 +621,8 @@ function drawPlayer() {
   let sheet, frameIndex;
   if (player.punching) {
     sheet = spriteImgs.punch_sheet; frameIndex = player.punchFrame;
+  } else if (!player.onGround) {
+    sheet = spriteImgs.jump_sheet; frameIndex = player.jumpFrame;
   } else if (player.walkFrame > 0 || (keys['a']||keys['d']||keys['arrowleft']||keys['arrowright'])) {
     sheet = spriteImgs.walk_sheet; frameIndex = player.walkFrame;
   } else {
