@@ -233,7 +233,14 @@ let inventory = {1:0,2:0,3:0,4:0,5:0,6:0,7:0};
 function buildHotbar() {
   const bar = document.getElementById('hotbar');
   bar.innerHTML = '';
+  // kalau slot yang sedang aktif kebetulan sudah habis, otomatis pindah ke slot lain yang masih ada isinya
+  if ((inventory[hotbarBlocks[selectedSlot]] || 0) === 0) {
+    const nextAvailable = hotbarBlocks.findIndex(bid => (inventory[bid] || 0) > 0);
+    if (nextAvailable !== -1) selectedSlot = nextAvailable;
+  }
   hotbarBlocks.forEach((bid, i) => {
+    const count = inventory[bid] || 0;
+    if (count === 0) return; // tidak punya item ini -> jangan tampilkan slotnya sama sekali
     const b = BLOCKS[bid];
     const div = document.createElement('div');
     div.className = 'slot' + (i === selectedSlot ? ' selected' : '');
@@ -252,7 +259,7 @@ function buildHotbar() {
       div.appendChild(swatch);
     }
     const span = document.createElement('span');
-    span.textContent = inventory[bid] || 0;
+    span.textContent = count;
     div.appendChild(span);
     bar.appendChild(div);
   });
