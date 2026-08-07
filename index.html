@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototipe Game Sandbox 2D - Farming System</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        canvas {
+            background-color: #87CEEB;
+            display: block;
+            margin: 10px auto;
+            border: 4px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .ui {
+            margin-top: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 0 5px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .inventory-panel {
+            background: #2a2a2a;
+            display: inline-block;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Prototipe Game 2D Sandbox - Sistem Farming</h2>
+    <p><b>Kontrol:</b> A/D atau Panah (Gerak), W/Spasi (Lompat). <b>Klik Kiri:</b> Hancurkan/Taruh/Tanam/Panen.</p>
+
+    <canvas id="gameCanvas" width="800" height="480"></canvas>
+
+    <div class="ui">
+        <div class="inventory-panel">
+            <strong>Inventory: </strong>
+            <button id="btn-1" class="active" onclick="selectItem(1, 'block')">Tanah (Dirt)</button>
+            <button id="btn-2" onclick="selectItem(2, 'block')">Batu (Rock)</button>
+            <button id="btn-3" onclick="selectItem(3, 'block')">Kayu (Wood)</button>
+            <button id="btn-4" onclick="selectItem(1, 'seed')" style="background-color: #8B4513; color: white;">Benih Tanah</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const TILE_SIZE = 32;
+        const COLS = 25;
+        const ROWS = 15;
+
+        // Struktur data dunia: menyimpan tipe block dan data pohon/farming
+        // world[r][c] = { type: 0, tree: null }
+        // Tipe block: 0 = Kosong, 1 = Tanah, 2 = Batu, 3 = Kayu
+        // Tree: null atau { stage: 1/2, timer: 0 } -> stage 1: Tunas, stage 2: Pohon Siap Panen
+        let world = [];
+        for (let r = 0; r < ROWS; r++) {
+            let row = [];
+            for (let c = 0; c < COLS; c++) {
+                if (r >= 12) {
+                    row.push({ type: 1, tree: null });
+                } else {
+                    row.push({ type: 0, tree: null });
+                }
+            }
+            world.push(row);
+        }
+
+        // Item yang sedang dipegang
+        let selectedItem = { id: 1, category: 'block' }; // category: 'block' atau 'seed'
+
+        function selectItem(id, category) {
+            selectedItem = { id, category };
+            document.querySelectorAll('.inventory-panel button').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        let player = {
+            x: 100,
+            y: 200,
+            width: 24,
+            height: 32,
+            vx: 0,
+            vy: 0,
+            speed: 3,
+            jumpForce: -9,
+            gravity: 0.4,
+            isGrounded: false
+        };
+
+        let keys = {};
+        window.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
+        window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
+
+        // Interaksi Klik Kiri
+        canvas.addEventListener("click", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const c = Math.floor(mouseX / TILE_SIZE);
+            const r = Math.floor(mouseY / TILE_SIZE);
+
+            if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+                const playerC = Math.floor((player.x + player.width/2) / TILE_SIZE);
+                const playerR = Math.floor((player.y + player.height/2) / TILE_SIZE);
+
+                // Batas jangkauan tangan player (4 tile)
+                if (Math.abs(c - playerC) <= 4 && Math.abs(r - playerR) <= 4) {
+                    let target = world[r][c];
+
+                    // 1. Jika ada pohon siap panen (stage 2), panen!
+                    if (target.tree && target.tree.stage === 2) {
+                        target.tree = null; // Pohon ditebang
+                        target.type = 1;     // Kembali jadi tanah biasa
+                        return;
+                    }
+
+                    // 2. Jika pemain memegang BENIH dan mengklik di atas TANAH kosong (tanpa block di atasnya)
+                    if (selectedItem.category === 'seed') {
+                        // Cek apakah tile ini adalah tanah dan tidak ada pohon di atasnya serta tile di atasnya kosong
+                        if (target.type === 1 && !target.tree) {
+                            // Cek tile tepat di atas tanah untuk ruang tumbuh pohon
+                            if (r > 0 && world[r-1][c].type === 0 && !world[r-1][c].tree) {
+                                // Tanam pohon di tile atasnya
+                                world[r-1][c].tree = { stage: 1, timer: 0 };
+                            }
+                        }
+                        return;
+                    }
+
+                    // 3. Jika mengklik pohon muda (stage 1) atau bagian pohon, bisa dihancurkan
+                    if (target.tree) {
+                        target.tree = null;
+                        return;
+                    }
+
+                    // 4. Interaksi blok biasa (Hancurkan / Taruh)
+                    if (target.type !== 0) {
+                        target.type = 0; // Hancurkan block
+                    } else if (selectedItem.category === 'block') {
+                        target.type = selectedItem.id; // Taruh block
+                    }
+                }
+            }
+        });
+
+        function checkCollision(nx, ny) {
+            let left = Math.floor(nx / TILE_SIZE);
+            let right = Math.floor((nx + player.width - 1) / TILE_SIZE);
+            let top = Math.floor(ny / TILE_SIZE);
+            let bottom = Math.floor((ny + player.height - 1) / TILE_SIZE);
+
+            if (left < 0 || right >= COLS || top < 0 || bottom >= ROWS) return true;
+
+            // Tabrakan dengan block fisik (pohon tidak memiliki fisik padat agar bisa dilewati/ditebang)
+            return (
+                world[top][left].type !== 0 ||
+                world[top][right].type !== 0 ||
+                world[bottom][left].type !== 0 ||
+                world[bottom][right].type !== 0
+            );
+        }
+
+        function update() {
+            // Update sistem pertumbuhan pohon (Farming Timer)
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let t = world[r][c].tree;
+                    if (t) {
+                        t.timer += 1;
+                        // 300 frame (~5 detik pada 60fps) untuk naik tingkat
+                        if (t.stage === 1 && t.timer > 300) {
+                            t.stage = 2; // Pohon tumbuh sempurna / siap panen
+                        }
+                    }
+                }
+            }
+
+            // Gerak Player
+            player.vx = 0;
+            if (keys['a'] || keys['arrowleft']) player.vx = -player.speed;
+            if (keys['d'] || keys['arrowright']) player.vx = player.speed;
+
+            let nextX = player.x + player.vx;
+            if (!checkCollision(nextX, player.y)) {
+                player.x = nextX;
+            }
+
+            player.vy += player.gravity;
+            if ((keys['w'] || keys['arrowup'] || keys[' ']) && player.isGrounded) {
+                player.vy = player.jumpForce;
+                player.isGrounded = false;
+            }
+
+            let nextY = player.y + player.vy;
+            if (!checkCollision(player.x, nextY)) {
+                player.y = nextY;
+                player.isGrounded = false;
+            } else {
+                if (player.vy > 0) player.isGrounded = true;
+                player.vy = 0;
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = "#87CEEB";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Gambar Dunia & Pohon
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let tile = world[r][c];
+                    let x = c * TILE_SIZE;
+                    let y = r * TILE_SIZE;
+
+                    // Gambar Block
+                    if (tile.type !== 0) {
+                        if (tile.type === 1) ctx.fillStyle = "#8B5A2B"; // Tanah
+                        else if (tile.type === 2) ctx.fillStyle = "#708090"; // Batu
+                        else if (tile.type === 3) ctx.fillStyle = "#DEB887"; // Kayu
+
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = "rgba(0,0,0,0.1)";
+                        ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+                    }
+
+                    // Gambar Pohon / Tunas jika ada di tile ini
+                    if (tile.tree) {
+                        if (tile.tree.stage === 1) {
+                            // Tunas kecil (Batang hijau muda)
+                            ctx.fillStyle = "#98FB98";
+                            ctx.fillRect(x + 10, y + 12, 12, 20);
+                        } else if (tile.tree.stage === 2) {
+                            // Pohon dewasa / siap panen (Batang cokelat + Daun hijau lebat)
+                            ctx.fillStyle = "#8B4513";
+                            ctx.fillRect(x + 12, y + 10, 8, 22); // Batang
+                            ctx.fillStyle = "#228B22";
+                            ctx.beginPath();
+                            ctx.arc(x + 16, y + 8, 14, 0, Math.PI * 2); // Daun bundar
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+
+            // Gambar Karakter
+            ctx.fillStyle = "#FF4500";
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            ctx.strokeStyle = "#000";
+            ctx.strokeRect(player.x, player.y, player.width, player.height);
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
