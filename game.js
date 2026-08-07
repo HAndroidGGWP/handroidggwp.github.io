@@ -165,6 +165,98 @@ bindHold(document.getElementById('btnLeft'), 'a');
 bindHold(document.getElementById('btnRight'), 'd');
 bindHold(document.getElementById('btnJump'), ' ');
 
+// ====== ZOOM ======
+let zoom = 1;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.5;
+const ZOOM_STEP = 0.15;
+function setZoom(z) {
+  zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+}
+document.getElementById('btnZoomIn').addEventListener('click', () => setZoom(zoom + ZOOM_STEP));
+document.getElementById('btnZoomOut').addEventListener('click', () => setZoom(zoom - ZOOM_STEP));
+document.getElementById('btnZoomIn').addEventListener('touchstart', e => { e.preventDefault(); setZoom(zoom + ZOOM_STEP); }, {passive:false});
+document.getElementById('btnZoomOut').addEventListener('touchstart', e => { e.preventDefault(); setZoom(zoom - ZOOM_STEP); }, {passive:false});
+
+// zoom pakai scroll wheel mouse (desktop)
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  setZoom(zoom + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+}, {passive:false});
+
+// zoom pakai pinch dua jari (mobile/touch)
+let pinchStartDist = null;
+let pinchStartZoom = 1;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    pinchStartDist = Math.hypot(dx, dy);
+    pinchStartZoom = zoom;
+  }
+}, {passive:true});
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && pinchStartDist) {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    setZoom(pinchStartZoom * (dist / pinchStartDist));
+  }
+}, {passive:false});
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length < 2) pinchStartDist = null;
+}, {passive:true});
+
+// ====== FULLSCREEN LANDSCAPE ======
+const gameContainer = document.getElementById('gameContainer');
+const btnFullscreen = document.getElementById('btnFullscreen');
+
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+async function enterFullscreen() {
+  const el = gameContainer;
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+  } catch (err) {
+    showMsg('Fullscreen tidak didukung');
+    return;
+  }
+  // coba kunci orientasi ke landscape (hanya berfungsi di sebagian browser mobile)
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      await screen.orientation.lock('landscape');
+    }
+  } catch (err) {
+    // diabaikan - beberapa browser (mis. iOS Safari) tidak mendukung orientation lock
+  }
+}
+
+function exitFullscreen() {
+  if (document.exitFullscreen) document.exitFullscreen();
+  else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+}
+
+function toggleFullscreen() {
+  if (isFullscreen()) exitFullscreen();
+  else enterFullscreen();
+}
+
+btnFullscreen.addEventListener('click', toggleFullscreen);
+btnFullscreen.addEventListener('touchstart', e => { e.preventDefault(); toggleFullscreen(); }, {passive:false});
+
+function onFullscreenChange() {
+  btnFullscreen.textContent = isFullscreen() ? '⤢' : '⛶';
+  if (!isFullscreen() && screen.orientation && screen.orientation.unlock) {
+    try { screen.orientation.unlock(); } catch (err) {}
+  }
+}
+document.addEventListener('fullscreenchange', onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
 // Tombol pukul (touch) - menggali blok di depan karakter
 let touchPunchActive = false;
 const btnPunch = document.getElementById('btnPunch');
@@ -293,17 +385,29 @@ function collideAt(x, y) {
 
 let camX = 0, camY = 0;
 function updateCamera() {
-  camX = player.x - canvas.width/2;
-  camY = player.y - canvas.height/2;
-  camX = Math.max(0, Math.min(camX, COLS*TILE - canvas.width));
-  camY = Math.max(0, Math.min(camY, ROWS*TILE - canvas.height));
+  const viewW = canvas.width / zoom;
+  const viewH = canvas.height / zoom;
+  camX = player.x + player.w/2 - viewW/2;
+  camY = player.y + player.h/2 - viewH/2;
+  camX = Math.max(0, Math.min(camX, Math.max(0, COLS*TILE - viewW)));
+  camY = Math.max(0, Math.min(camY, Math.max(0, ROWS*TILE - viewH)));
 }
 
 let mouse = { x: 0, y: 0, down: false };
-canvas.addEventListener('mousemove', e => {
+// Konversi koordinat layar (CSS px) ke koordinat internal canvas (800x480),
+// perlu karena canvas bisa di-stretch via CSS saat fullscreen.
+function toCanvasCoords(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - rect.left;
-  mouse.y = e.clientY - rect.top;
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY,
+  };
+}
+canvas.addEventListener('mousemove', e => {
+  const p = toCanvasCoords(e.clientX, e.clientY);
+  mouse.x = p.x; mouse.y = p.y;
 });
 canvas.addEventListener('mousedown', e => {
   if (e.button === 0) { mouse.down = true; player.punching = true; }
@@ -314,8 +418,9 @@ canvas.addEventListener('mouseup', e => {
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('touchstart', e => {
-  const t = e.touches[0]; const rect = canvas.getBoundingClientRect();
-  mouse.x = t.clientX - rect.left; mouse.y = t.clientY - rect.top;
+  const t = e.touches[0];
+  const p = toCanvasCoords(t.clientX, t.clientY);
+  mouse.x = p.x; mouse.y = p.y;
   mouse.down = true; player.punching = true;
 }, {passive:true});
 canvas.addEventListener('touchend', () => { mouse.down = false; player.punching = false; }, {passive:true});
@@ -328,8 +433,8 @@ function getTargetTile() {
     const row = Math.floor(pcy / TILE);
     return { col, row };
   }
-  const wx = mouse.x + camX;
-  const wy = mouse.y + camY;
+  const wx = mouse.x / zoom + camX;
+  const wy = mouse.y / zoom + camY;
   const col = Math.floor(wx / TILE);
   const row = Math.floor(wy / TILE);
   const pcx = player.x + player.w/2, pcy = player.y + player.h/2;
@@ -400,13 +505,17 @@ function updateInvInfo() {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.scale(zoom, zoom);
+  const viewW = canvas.width / zoom;
+  const viewH = canvas.height / zoom;
   ctx.fillStyle = '#cdeeff';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0,0,viewW,viewH);
 
   const startCol = Math.floor(camX / TILE);
-  const endCol = startCol + Math.ceil(canvas.width / TILE) + 1;
+  const endCol = startCol + Math.ceil(viewW / TILE) + 1;
   const startRow = Math.floor(camY / TILE);
-  const endRow = startRow + Math.ceil(canvas.height / TILE) + 1;
+  const endRow = startRow + Math.ceil(viewH / TILE) + 1;
   const undergroundStart = Math.floor(ROWS * 0.45) + 1;
 
   for (let row = startRow; row <= endRow; row++) {
@@ -480,6 +589,7 @@ function draw() {
   }
 
   drawPlayer();
+  ctx.restore();
 }
 
 function drawPlayer() {

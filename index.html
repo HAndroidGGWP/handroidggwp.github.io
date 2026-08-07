@@ -2,26 +2,38 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Game</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="gameWrap">
-  <canvas id="game" width="800" height="480"></canvas>
-  <div id="msg"></div>
-  <div id="touchControls">
-    <div class="ctlBtn" id="btnLeft">◀</div>
-    <div class="ctlBtn" id="btnRight">▶</div>
+<div id="gameContainer">
+  <div id="gameWrap">
+    <canvas id="game" width="800" height="480"></canvas>
+    <div id="msg"></div>
+    <div id="rotateHint">🔄 Putar perangkat ke mode landscape</div>
+    <div id="touchControls">
+      <div class="ctlBtn" id="btnLeft">◀</div>
+      <div class="ctlBtn" id="btnRight">▶</div>
+    </div>
+    <div id="jumpControl">
+      <div class="ctlBtn" id="btnJump">⤒</div>
+      <div class="ctlBtn" id="btnPunch">✊</div>
+    </div>
+    <div id="topControl">
+      <div class="ctlBtn" id="btnZoomIn">+</div>
+      <div class="ctlBtn" id="btnZoomOut">−</div>
+      <div class="ctlBtn" id="btnFullscreen">⛶</div>
+    </div>
   </div>
-  <div id="jumpControl">
-    <div class="ctlBtn" id="btnJump">⤒</div>
-    <div class="ctlBtn" id="btnPunch">✊</div>
+  <div id="inventoryFrame">
+    <div id="inventoryLabel">Inventaris</div>
+    <div id="hotbar"></div>
   </div>
-</div>
-<div id="hotbar"></div>
-<div id="stats">
-  <span id="posInfo">Posisi: -</span>
-  <span id="invInfo">Item terkumpul: 0</span>
+  <div id="stats">
+    <span id="posInfo">Posisi: -</span>
+    <span id="invInfo">Item terkumpul: 0</span>
+  </div>
 </div>
 
 <script src="game.js"></script>

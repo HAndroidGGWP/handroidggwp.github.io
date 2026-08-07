@@ -11,6 +11,10 @@ h1 {
   margin:10px 0 4px 0; font-size:22px; letter-spacing:1px;
 }
 #sub { color:#245; font-size:12px; margin-bottom:8px; text-align:center; }
+
+#gameContainer {
+  display:flex; flex-direction:column; align-items:center;
+}
 #gameWrap {
   position:relative;
   border:4px solid #5c4033;
@@ -19,9 +23,24 @@ h1 {
   background:#bfe6ff;
 }
 canvas { display:block; image-rendering:pixelated; cursor:crosshair; }
+
+/* ====== Inventory frame ====== */
+#inventoryFrame {
+  margin-top:10px;
+  padding:8px 12px 10px;
+  background:linear-gradient(180deg,#8a6540,#6b4a2c);
+  border:3px solid #5c4033;
+  border-radius:10px;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,0.12), 0 6px 14px rgba(0,0,0,0.3);
+}
+#inventoryLabel {
+  color:#fff2d8; font-size:11px; font-weight:bold; letter-spacing:1px;
+  text-shadow:1px 1px 1px rgba(0,0,0,0.6);
+  margin-bottom:6px; text-align:center; text-transform:uppercase;
+}
 #hotbar {
-  display:flex; gap:6px; margin-top:10px; background:rgba(0,0,0,0.35);
-  padding:8px; border-radius:10px;
+  display:flex; gap:6px; background:rgba(0,0,0,0.35);
+  padding:8px; border-radius:8px;
 }
 .slot {
   width:44px; height:44px; border-radius:6px;
@@ -63,3 +82,59 @@ canvas { display:block; image-rendering:pixelated; cursor:crosshair; }
 }
 #jumpControl .ctlBtn { width:70px; height:70px; font-size:20px; background:rgba(255,210,80,0.5); border-color:rgba(255,210,80,0.85); }
 #jumpControl .ctlBtn:active, #jumpControl .ctlBtn.active { background:rgba(255,210,80,0.8); }
+#topControl {
+  position:absolute; top:12px; right:12px; display:flex; flex-direction:column; gap:8px;
+  touch-action:none;
+}
+#topControl .ctlBtn {
+  width:38px; height:38px; font-size:18px; font-weight:bold;
+  background:rgba(0,0,0,0.35); border-color:rgba(255,255,255,0.6);
+}
+#topControl .ctlBtn:active, #topControl .ctlBtn.active { background:rgba(0,0,0,0.6); }
+#btnFullscreen { font-size:16px; }
+
+/* ====== Rotate hint (muncul saat fullscreen tapi orientasi masih portrait) ====== */
+#rotateHint {
+  position:absolute; inset:0; z-index:20;
+  display:none; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.8); color:#fff; font-size:18px; text-align:center;
+  padding:20px;
+}
+
+/* ====== Fullscreen landscape ====== */
+#gameContainer:fullscreen {
+  width:100vw; height:100vh;
+  background:#0b0b12;
+  display:flex; flex-direction:row; align-items:center; justify-content:center;
+  gap:14px;
+}
+#gameContainer:-webkit-full-screen {
+  width:100vw; height:100vh;
+  background:#0b0b12;
+  display:flex; flex-direction:row; align-items:center; justify-content:center;
+  gap:14px;
+}
+#gameContainer:fullscreen #gameWrap,
+#gameContainer:-webkit-full-screen #gameWrap {
+  border:none; border-radius:0; box-shadow:none;
+  width:min(100vw, 100vh * 1.6667);
+  height:min(100vh, 100vw / 1.6667);
+}
+#gameContainer:fullscreen canvas,
+#gameContainer:-webkit-full-screen canvas {
+  width:100%; height:100%;
+}
+#gameContainer:fullscreen #inventoryFrame,
+#gameContainer:-webkit-full-screen #inventoryFrame {
+  margin-top:0;
+}
+#gameContainer:fullscreen #stats,
+#gameContainer:-webkit-full-screen #stats {
+  display:none;
+}
+@media (orientation: portrait) {
+  #gameContainer:fullscreen #rotateHint,
+  #gameContainer:-webkit-full-screen #rotateHint {
+    display:flex;
+  }
+}
