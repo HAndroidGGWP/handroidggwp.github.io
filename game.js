@@ -85,8 +85,8 @@ let breakProgress = {};
 const player = {
   x: Math.floor(COLS/2) * TILE,
   y: 0,
-  w: TILE - 4,
-  h: TILE * 2 - 2,
+  w: TILE,
+  h: TILE,
   vx: 0, vy: 0,
   speed: 2.8,
   jumpPower: 8.2,
